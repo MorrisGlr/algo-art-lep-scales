@@ -1,14 +1,12 @@
 # Lepidopetera Scale Algorithic Art
 
 ## Overview
-My [algorithmic art](https://en.wikipedia.org/wiki/Algorithmic_art) (algo art) project was inspired by the overlapping scales of butterfly and moth wings. The animation is created using the Three.js library, that allows web browsers to play 3D graphic animations.
+My [algorithmic art](https://en.wikipedia.org/wiki/Algorithmic_art) (algo art) project was inspired by the overlapping scales of butterfly and moth wings. The animation is created using the Three.js library, that allows web browsers to play 3D graphic animations. 
 
-The artwork of [Edward Hopper](https://en.wikipedia.org/wiki/Edward_Hopper) and the old architecture of Pennsylvania with ornate windows inspired my . My objective was to create a 3D animation via the Three.js library that converys depth and space similar to rooms dispicted in Hopper's paintings. Additionally, I made the Javascript code such that [traits of the windows](https://www.windowsonlineuk.co.uk/blog/what-are-the-different-parts-of-a-window/) window opening size, stool, casing, sash, sill and lintels) could be modified.
+<b>You can view the animation in your own browser by following [this link](https://morrisglr.github.io/algo-art-lep-scales/)!</b>
 
-<b>You can view the animation in your own browser by following [this link]()!</b>
-
-## Visual Description 
-
+## Visual Description
+I created a simple 3D model of scales placed on a repeating grid pattern. I had the scales gently oscillate to create a wave-like motion. Each animation starts with a close-up of a cluster of scales and slowly zooms out to reveal the entire grid of scales and how, in aggregate, they have motion similar to ripples.
 
 ## Conceptual Inspiration
 Butterfly and moth wings are covered by overlapping scales that give these [lepidopterans](https://en.wikipedia.org/wiki/Lepidoptera) their color and wing patterns. However, the scales are usually too small to be seen individually by the naked eye. Magnified images reaveal the repeating scale organization that motivated to translate these visuals into algorithmic art. Seeing the individual scales is like looking at the pixels in a digital image and as one zooms out, the scales collectively look like a rolling wave of color.
@@ -16,7 +14,7 @@ Butterfly and moth wings are covered by overlapping scales that give these [lepi
 <table>
   <tr>
     <td align="center">
-        <img src="https://live.staticflickr.com/4827/44191749710_593c63ec0d_b.jpg" width="250" alt="w20170601_172029"/>
+        <img src="https://live.staticflickr.com/4827/44191749710_593c63ec0d_b.jpg" width="250" alt="w20170601_172029"/><br/>
         <sub>Eye spot of a moth that I photographed and one can make out the scales when on zooms in. Morris Aguilar. 2017.</sub>
     </td>
     <td align="center">
@@ -32,15 +30,15 @@ Butterfly and moth wings are covered by overlapping scales that give these [lepi
 <table>
   <tr>
     <td align="center">
-      <img src="media/morris_aguilar_scales_16.jpeg" width="250"/><br/>
+      <img src="media/morris_aguilar_scales_16.jpeg" width="250" height="225"/><br/>
       <sub>Single Frame of Scales 16 Algo Art. Morris Aguilar. 2023.</sub>
     </td>
     <td align="center">
-      <img src="media/morris_aguilar_scales_19.jpeg" width="250"/><br/>
+      <img src="media/morris_aguilar_scales_19.jpeg" width="250" height="225"/><br/>
       <sub>Single Frame of Scales 19 Algo Art. Morris Aguilar. 2023.</sub>
     </td>
     <td align="center">
-      <img src="media/morris_aguilar_scales_21.jpeg" width="250"/><br/>
+      <img src="media/morris_aguilar_scales_21.jpeg" width="250" height="225"/><br/>
       <sub>Single Frame of Scales 21 Algo Art. Morris Aguilar. 2023.</sub>
     </td>
   </tr>
