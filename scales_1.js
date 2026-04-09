@@ -1,10 +1,99 @@
+// ---------------------------------------------------------------------------
+// Seeded PRNG — mulberry32
+// Accepts a 32-bit integer seed; returns a function that produces floats [0,1).
+// ---------------------------------------------------------------------------
+function mulberry32(seed) {
+    return function() {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let z = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        z = z + Math.imul(z ^ z >>> 7, 61 | z) ^ z;
+        return ((z ^ z >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+// ---------------------------------------------------------------------------
+// URL hash parameter parsing
+// Parse #key=value&... pairs from window.location.hash.
+// ---------------------------------------------------------------------------
+function parseHashParams() {
+    const params = {};
+    const raw = window.location.hash.replace(/^#/, '');
+    if (!raw) return params;
+    raw.split('&').forEach(function(pair) {
+        const idx = pair.indexOf('=');
+        if (idx > 0) params[pair.slice(0, idx)] = pair.slice(idx + 1);
+    });
+    return params;
+}
+
+const hashParams = parseHashParams();
+
+// Seed: use #seed=N if present; otherwise generate randomly and write to hash.
+let SEED;
+if (hashParams.seed !== undefined && /^\d+$/.test(hashParams.seed)) {
+    SEED = parseInt(hashParams.seed, 10);
+} else {
+    SEED = Math.floor(Math.random() * 4294967296);
+    // Write seed into hash so the current view is reproducible.
+    const newHash = Object.assign({}, hashParams, { seed: SEED });
+    window.location.hash = Object.keys(newHash).map(function(k) {
+        return k + '=' + newHash[k];
+    }).join('&');
+}
+
+const seededRandom = mulberry32(SEED);
+
+// ---------------------------------------------------------------------------
+// URL hash parameters: density, speed, palette (seed is parsed above)
+// ---------------------------------------------------------------------------
+const DENSITY_DEFAULT = 1.0;
+const SPEED_DEFAULT   = 1.0;
+const PALETTE_DEFAULT = 'original';
+const PALETTES = {
+    'original':     { colorA: 0xeeb792, colorB: 0x20766b, sideTint: 0x969696, background: 0xafeeee },
+    'morpho':       { colorA: 0x00aaff, colorB: 0x0a1080, sideTint: 0x3a5a80, background: 0x08082e },
+    'monarch':      { colorA: 0xff8c00, colorB: 0x1a0a00, sideTint: 0x7a3500, background: 0xfff0d0 },
+    'luna':         { colorA: 0xc8f0a0, colorB: 0x1a5c2a, sideTint: 0x4a8040, background: 0xe8f5e0 },
+    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, sideTint: 0x8b4513, background: 0xe8e0d0 }
+};
+const VALID_PALETTES = Object.keys(PALETTES);
+
+let DENSITY = DENSITY_DEFAULT;
+let SPEED   = SPEED_DEFAULT;
+let PALETTE = PALETTE_DEFAULT;
+
+if (hashParams.density !== undefined) {
+    const d = parseFloat(hashParams.density);
+    if (!isNaN(d) && d >= 0.25 && d <= 4.0) {
+        DENSITY = d;
+    } else {
+        console.warn('[wing-scale] density out of range [0.25, 4.0]; using default', DENSITY_DEFAULT);
+    }
+}
+if (hashParams.speed !== undefined) {
+    const s = parseFloat(hashParams.speed);
+    if (!isNaN(s) && s >= 0.1 && s <= 10.0) {
+        SPEED = s;
+    } else {
+        console.warn('[wing-scale] speed out of range [0.1, 10.0]; using default', SPEED_DEFAULT);
+    }
+}
+if (hashParams.palette !== undefined) {
+    if (VALID_PALETTES.indexOf(hashParams.palette) !== -1) {
+        PALETTE = hashParams.palette;
+    } else {
+        console.warn('[wing-scale] unknown palette "' + hashParams.palette + '"; using default "' + PALETTE_DEFAULT + '"');
+    }
+}
+const activePalette = PALETTES[PALETTE];
+
+// ---------------------------------------------------------------------------
 // Parameters to adjust the animation
-let number_of_clones = 3750; // Number of clones to create, 955
+// ---------------------------------------------------------------------------
+let number_of_clones = Math.round(3750 * DENSITY); // base 3750 scales, scaled by density
 let spacing = 0.48; // Set the spacing between clones
 let verticalSpacing = 0.49; // Set the vertical spacing between clones
 let scaleThickness = 0.15; // Set the thickness of the butterfly scale
-const scaleColor1 = 0xeeb792
-const scaleColor2 = 0x20766b
 
 
 // Set up the basic Three.js scene, camera, and renderer.
@@ -15,7 +104,13 @@ camera.position.y = 0;
 let renderer = new THREE.WebGLRenderer({ antialias: true }); // Create a renderer that will draw our scene
 renderer.setSize(window.innerWidth, window.innerHeight); // Set the size of the rendering view
 document.body.appendChild(renderer.domElement); // Attach the renderer to the HTML document
-renderer.setClearColor(0xafeeee); //0xe1e1e1
+renderer.setClearColor(activePalette.background);
+
+// Lighting: directional (top-right illumination) + ambient (prevents pure-black shadows).
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+directionalLight.position.set(1, 1, 1);
+scene.add(directionalLight);
+scene.add(new THREE.AmbientLight(0xffffff, 0.3));
 
 
 // Set up ccapture.js to record the animation
@@ -37,154 +132,209 @@ window.addEventListener('keydown', function(event) {
             capturer.save();
         }
     }
+    if (event.key === 'r' || event.key === 'R') {
+        rotationStartTime = Date.now() + rotationDelay;
+        camera.zoom = startZoom;
+        camera.rotation.x = startRotation;
+        camera.rotation.z = startRotation;
+        camera.updateProjectionMatrix();
+    }
 });
 
 
-// Define the geometry and material for the basic rectangular prism mesh.
-// Color gradient
+// Define the geometry and material for the scale mesh.
+
+// Color gradient helpers
 function hexToNormalizedRGB(hex) {
     return {
-      r: ((hex >> 16) & 255) / 255,
-      g: ((hex >> 8) & 255) / 255,
-      b: (hex & 255) / 255
+        r: ((hex >> 16) & 255) / 255,
+        g: ((hex >> 8) & 255) / 255,
+        b: (hex & 255) / 255
     };
-  }
-const scaleColor1Norm = hexToNormalizedRGB(scaleColor1);
-const scaleColor2Norm = hexToNormalizedRGB(scaleColor2);
+}
+const paletteColorANorm = hexToNormalizedRGB(activePalette.colorA);
+const paletteColorBNorm = hexToNormalizedRGB(activePalette.colorB);
 const scaleUniforms = {
-    colorA: { value: new THREE.Vector3(scaleColor1Norm.r, scaleColor1Norm.g, scaleColor1Norm.b) },
-    colorB: { value: new THREE.Vector3(scaleColor2Norm.r, scaleColor2Norm.g, scaleColor2Norm.b) }
-  };
-  // Create a shader
-  const scaleVertexShader = `
+    colorA: { value: new THREE.Vector3(paletteColorANorm.r, paletteColorANorm.g, paletteColorANorm.b) },
+    colorB: { value: new THREE.Vector3(paletteColorBNorm.r, paletteColorBNorm.g, paletteColorBNorm.b) }
+};
+const scaleVertexShader = `
     varying vec2 vUv;
+    varying vec3 vNormal;
     void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
     }
-  `;
-  const scaleFragmentShader = `
+`;
+const scaleFragmentShader = `
     uniform vec3 colorA;
     uniform vec3 colorB;
     varying vec2 vUv;
+    varying vec3 vNormal;
     void main() {
-      vec3 color = mix(colorA, colorB, vUv.x);
-      gl_FragColor = vec4(color, 1.0);
+        vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
+        float diffuse = max(dot(vNormal, lightDir), 0.0);
+        float lightFactor = 0.5 + 0.5 * diffuse;
+        vec3 color = mix(colorA, colorB, vUv.x) * lightFactor;
+        gl_FragColor = vec4(color, 1.0);
     }
-  `;
-  const scaleMaterial = new THREE.ShaderMaterial({
+`;
+const scaleMaterial = new THREE.ShaderMaterial({
     vertexShader: scaleVertexShader,
     fragmentShader: scaleFragmentShader,
     uniforms: scaleUniforms,
-    side: THREE.BackSide
-  });
-// Custom butterfly scale geometry
-var scaleGeometry = new THREE.Geometry();
-
-// Define the vertices of the scale shape
-scaleGeometry.vertices.push(
-    // Front face
-    new THREE.Vector3(-0.35, 0, 0),  // Vertex 0
-    new THREE.Vector3(-0.2, 0.15, 0), // Vertex 1
-    new THREE.Vector3(-0.45, 0.25, 0),  // Vertex 2
-    new THREE.Vector3(0.25, 0.18, 0),    // Vertex 3
-    new THREE.Vector3(0.125, 0, 0), // Vertex 4
-    new THREE.Vector3(0.25, -0.18, 0), // Vertex 5
-    new THREE.Vector3(-0.45, -0.25, 0), // Vertex 6
-    new THREE.Vector3(-0.2, -0.15, 0), // Vertex 7
-    // Back face
-    new THREE.Vector3(-0.35, 0, -scaleThickness),  // Vertex 8
-    new THREE.Vector3(-0.2, 0.15, -scaleThickness), // Vertex 9
-    new THREE.Vector3(-0.45, 0.25, -scaleThickness),  // Vertex 10
-    new THREE.Vector3(0.25, 0.18, -scaleThickness),    // Vertex 11
-    new THREE.Vector3(0.125, 0, -scaleThickness), // Vertex 12
-    new THREE.Vector3(0.25, -0.18, -scaleThickness), // Vertex 13
-    new THREE.Vector3(-0.45, -0.25, -scaleThickness), // Vertex 14
-    new THREE.Vector3(-0.2, -0.15, -scaleThickness) // Vertex 15
-);
-
-// Create faces using the vertices
-scaleGeometry.faces.push(
-    // Front face
-    new THREE.Face3(0, 3, 4),
-    new THREE.Face3(0, 1, 3),
-    new THREE.Face3(1, 2, 3),
-    new THREE.Face3(0, 4, 5),
-    new THREE.Face3(0, 5, 7),
-    new THREE.Face3(6, 7, 5),
-    // Back face
-    new THREE.Face3(8, 11, 12),
-    new THREE.Face3(8, 9, 11),
-    new THREE.Face3(9, 10, 11),
-    new THREE.Face3(8, 12, 13),
-    new THREE.Face3(8, 13, 15),
-    new THREE.Face3(14, 15, 13)
-    // Side faces, six side faces total.
-    // new THREE.Face3(1, 7, 8),
-    // new THREE.Face3(1, 8, 2),
-    // new THREE.Face3(2, 8, 9),
-    // new THREE.Face3(2, 9, 3),
-    // new THREE.Face3(3, 9, 10),
-    // new THREE.Face3(3, 10, 4),
-    // new THREE.Face3(4, 10, 11),
-    // new THREE.Face3(4, 11, 5),
-    // new THREE.Face3(5, 11, 6),
-    // new THREE.Face3(6, 0, 5),
-    // new THREE.Face3(6, 0, 7),
-    // new THREE.Face3(7, 0, 1)
-);
-scaleGeometry.computeFaceNormals();
-// Manually set UV coordinates for each face
-scaleGeometry.faceVertexUvs[0] = [];
-scaleGeometry.faces.forEach(face => {
-    scaleGeometry.faceVertexUvs[0].push([
-        new THREE.Vector2(0.5, 0.9), // UV for vertex 0
-        new THREE.Vector2(0.2, 0.5), // UV for the second vertex of the face
-        new THREE.Vector2(0.9, 0.5)  // UV for the third vertex of the face
-        // Adjust these values to spread the UVs around vertex 0's UV
-    ]);
+    side: THREE.DoubleSide
 });
-scaleGeometry.uvsNeedUpdate = true;
+const sideMaterial = new THREE.MeshBasicMaterial({ color: activePalette.sideTint, side: THREE.DoubleSide });
 
-// let geometry = new THREE.BoxGeometry(0.75, 0.25, 0.1); // Define the shape of the mesh (a thin rectangular prism)
-// let testMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
-let scaleMesh = new THREE.Mesh(scaleGeometry, scaleMaterial); // Create the mesh by combining the geometry and material
+// Custom butterfly scale geometry — BufferGeometry, DoubleSide.
+// 16 base vertices: front ring (z=0) and back ring (z=-scaleThickness).
+// x coordinates are pre-offset by -0.4 so the pivot point sits at x=0 of each instance,
+// matching the original clone.position.set(-0.4, 0, 0) behavior.
+//
+// Front vertices (0-7):       Back vertices (8-15, same x/y, z=-scaleThickness):
+//   0: (-0.75,  0.00, 0)        8: (-0.75,  0.00, -t)
+//   1: (-0.60,  0.15, 0)        9: (-0.60,  0.15, -t)
+//   2: (-0.85,  0.25, 0)       10: (-0.85,  0.25, -t)
+//   3: (-0.15,  0.18, 0)       11: (-0.15,  0.18, -t)
+//   4: (-0.275, 0.00, 0)       12: (-0.275, 0.00, -t)
+//   5: (-0.15, -0.18, 0)       13: (-0.15, -0.18, -t)
+//   6: (-0.85, -0.25, 0)       14: (-0.85, -0.25, -t)
+//   7: (-0.60, -0.15, 0)       15: (-0.60, -0.15, -t)
+
+const t = scaleThickness; // shorthand
+
+// Helper to build a flat [x,y,z, u,v] entry for the frontBack geometry
+function fbv(x, y, z, u, v) { return [x, y, z, u, v]; }
+// Helper for side geometry: flat [x,y,z]
+function sv(x, y, z) { return [x, y, z]; }
+
+// Original UV scheme: every triangle face assigns its three vertices
+// UVs (0.5,0.9), (0.2,0.5), (0.9,0.5) in face-vertex order.
+// We replicate this exactly by expanding to unindexed geometry (no shared vertices).
+// Front faces: (0,3,4), (0,1,3), (1,2,3), (0,4,5), (0,5,7), (6,7,5)
+// Back faces:  (8,11,12), (8,9,11), (9,10,11), (8,12,13), (8,13,15), (14,15,13)
+const frontBackData = [
+    // Front face triangles — (A, B, C) → UVs (0.5,0.9), (0.2,0.5), (0.9,0.5)
+    fbv(-0.75, 0,     0, 0.5, 0.9), fbv(-0.15,  0.18, 0, 0.2, 0.5), fbv(-0.275, 0,    0, 0.9, 0.5), // (0,3,4)
+    fbv(-0.75, 0,     0, 0.5, 0.9), fbv(-0.60,  0.15, 0, 0.2, 0.5), fbv(-0.15,  0.18, 0, 0.9, 0.5), // (0,1,3)
+    fbv(-0.60, 0.15,  0, 0.5, 0.9), fbv(-0.85,  0.25, 0, 0.2, 0.5), fbv(-0.15,  0.18, 0, 0.9, 0.5), // (1,2,3)
+    fbv(-0.75, 0,     0, 0.5, 0.9), fbv(-0.275, 0,    0, 0.2, 0.5), fbv(-0.15, -0.18, 0, 0.9, 0.5), // (0,4,5)
+    fbv(-0.75, 0,     0, 0.5, 0.9), fbv(-0.15, -0.18, 0, 0.2, 0.5), fbv(-0.60, -0.15, 0, 0.9, 0.5), // (0,5,7)
+    fbv(-0.85, -0.25, 0, 0.5, 0.9), fbv(-0.60, -0.15, 0, 0.2, 0.5), fbv(-0.15, -0.18, 0, 0.9, 0.5), // (6,7,5)
+    // Back face triangles — same UV pattern, z=-t
+    fbv(-0.75, 0,     -t, 0.5, 0.9), fbv(-0.15,  0.18, -t, 0.2, 0.5), fbv(-0.275, 0,    -t, 0.9, 0.5), // (8,11,12)
+    fbv(-0.75, 0,     -t, 0.5, 0.9), fbv(-0.60,  0.15, -t, 0.2, 0.5), fbv(-0.15,  0.18, -t, 0.9, 0.5), // (8,9,11)
+    fbv(-0.60, 0.15,  -t, 0.5, 0.9), fbv(-0.85,  0.25, -t, 0.2, 0.5), fbv(-0.15,  0.18, -t, 0.9, 0.5), // (9,10,11)
+    fbv(-0.75, 0,     -t, 0.5, 0.9), fbv(-0.275, 0,    -t, 0.2, 0.5), fbv(-0.15, -0.18, -t, 0.9, 0.5), // (8,12,13)
+    fbv(-0.75, 0,     -t, 0.5, 0.9), fbv(-0.15, -0.18, -t, 0.2, 0.5), fbv(-0.60, -0.15, -t, 0.9, 0.5), // (8,13,15)
+    fbv(-0.85, -0.25, -t, 0.5, 0.9), fbv(-0.60, -0.15, -t, 0.2, 0.5), fbv(-0.15, -0.18, -t, 0.9, 0.5), // (14,15,13)
+];
+const fbPositions = new Float32Array(frontBackData.length * 3);
+const fbUvs       = new Float32Array(frontBackData.length * 2);
+for (let i = 0; i < frontBackData.length; i++) {
+    fbPositions[i*3]   = frontBackData[i][0];
+    fbPositions[i*3+1] = frontBackData[i][1];
+    fbPositions[i*3+2] = frontBackData[i][2];
+    fbUvs[i*2]   = frontBackData[i][3];
+    fbUvs[i*2+1] = frontBackData[i][4];
+}
+const frontBackGeometry = new THREE.BufferGeometry();
+frontBackGeometry.setAttribute('position', new THREE.BufferAttribute(fbPositions, 3));
+frontBackGeometry.setAttribute('uv',       new THREE.BufferAttribute(fbUvs,       2));
+frontBackGeometry.computeVertexNormals();
+
+// Side faces: 8 quads connecting perimeter edges (0→1→2→3→4→5→6→7→0)
+// to the corresponding back-ring edges. Each quad = 2 triangles.
+// Winding: (fi, fi+1, bi+1), (fi, bi+1, bi) for outward normals.
+const perimF = [
+    [-0.75, 0,     0], [-0.60, 0.15,  0], [-0.85, 0.25,  0], [-0.15, 0.18,  0],
+    [-0.275, 0,    0], [-0.15, -0.18, 0], [-0.85, -0.25, 0], [-0.60, -0.15, 0]
+];
+const sideData = [];
+for (let i = 0; i < 8; i++) {
+    const next = (i + 1) % 8;
+    const [fx0, fy0] = perimF[i];
+    const [fx1, fy1] = perimF[next];
+    // Triangle A: fi, fi+1, bi+1
+    sideData.push(sv(fx0, fy0, 0), sv(fx1, fy1, 0), sv(fx1, fy1, -t));
+    // Triangle B: fi, bi+1, bi
+    sideData.push(sv(fx0, fy0, 0), sv(fx1, fy1, -t), sv(fx0, fy0, -t));
+}
+const sidePositions = new Float32Array(sideData.length * 3);
+for (let i = 0; i < sideData.length; i++) {
+    sidePositions[i*3]   = sideData[i][0];
+    sidePositions[i*3+1] = sideData[i][1];
+    sidePositions[i*3+2] = sideData[i][2];
+}
+const sideGeometry = new THREE.BufferGeometry();
+sideGeometry.setAttribute('position', new THREE.BufferAttribute(sidePositions, 3));
+sideGeometry.computeVertexNormals();
 
 
-// Clone and arrange the meshes in a grid-like pattern.
-// Clone and arrange the meshes in a grid-like pattern.
-let clones = []; // Array to store all the cloned meshes
-let pivots = []; // Array to store pivots for each clone
-let rows = Math.ceil(Math.sqrt(number_of_clones)); // Determine the number of rows in the grid
+// Build InstancedMesh grid — replaces 3,750 individual clone+pivot pairs with two
+// single draw calls (frontBack faces + side faces).
+const NUMBER_OF_SCALES = number_of_clones;
+const instancedFrontBack = new THREE.InstancedMesh(frontBackGeometry, scaleMaterial, NUMBER_OF_SCALES);
+const instancedSide      = new THREE.InstancedMesh(sideGeometry,      sideMaterial,  NUMBER_OF_SCALES);
+instancedFrontBack.frustumCulled = false;
+instancedSide.frustumCulled      = false;
+scene.add(instancedFrontBack);
+scene.add(instancedSide);
 
-// Calculate the total width and height of the grid to center it
-let gridWidth = (rows - 1) * spacing;
-let gridHeight = (Math.ceil(number_of_clones / rows) - 1) * verticalSpacing; // Use verticalSpacing here
+// Pre-compute grid positions (same math as former clone loop).
+let rows      = Math.ceil(Math.sqrt(NUMBER_OF_SCALES));
+let gridWidth  = (rows - 1) * spacing;
+let gridHeight = (Math.ceil(NUMBER_OF_SCALES / rows) - 1) * verticalSpacing;
 
-for (let i = 0; i < number_of_clones; i++) {
-    let clone = scaleMesh.clone(); // Create a clone of the original mesh
-    let pivot = new THREE.Object3D(); // Create a pivot for each clone
-    pivot.add(clone); // Add the clone to its pivot
-    clone.position.set(-0.4, 0, 0); // Position the clone relative to the pivot
-
-    // Calculate the row and column for each clone
+const instancePositions = new Float32Array(NUMBER_OF_SCALES * 3);
+for (let i = 0; i < NUMBER_OF_SCALES; i++) {
     let row = Math.floor(i / rows);
     let col = i % rows;
-
-    // Set the position of the pivot to arrange clones in a grid on the X and Y axes
-    // Adjust positions to center the grid
-    let xPosition = (col * spacing) - (gridWidth / 2);
-    let yPosition = (row * verticalSpacing) - (gridHeight / 2); // Use verticalSpacing here
-    pivot.position.set(xPosition, yPosition, 0); // Z coordinate is constant
-
-    pivots.push(pivot); // Store the pivot
-    scene.add(pivot); // Add the pivot (with the clone) to the scene
+    instancePositions[i*3]   = (col * spacing)        - (gridWidth  / 2);
+    instancePositions[i*3+1] = (row * verticalSpacing) - (gridHeight / 2);
+    instancePositions[i*3+2] = 0;
 }
+
+// Reusable objects for per-frame matrix composition.
+const _matrix     = new THREE.Matrix4();
+const _position   = new THREE.Vector3();
+const _quaternion = new THREE.Quaternion();
+const _scale      = new THREE.Vector3(1, 1, 1);
+const _euler      = new THREE.Euler();
+
+// Per-scale oscillation phase offsets — seeded so the same seed always produces
+// the same wave pattern. Each offset is a random angle in [0, 2π).
+const phaseOffsets = new Float32Array(NUMBER_OF_SCALES);
+for (let i = 0; i < NUMBER_OF_SCALES; i++) {
+    phaseOffsets[i] = seededRandom() * Math.PI * 2;
+}
+
+// Seed overlay — display current seed in bottom-left corner.
+(function() {
+    let overlay = document.getElementById('seed-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'seed-overlay';
+        overlay.style.cssText = [
+            'position:fixed', 'bottom:8px', 'left:8px',
+            'font-family:monospace', 'font-size:11px',
+            'color:#333', 'opacity:0.5', 'pointer-events:none',
+            'z-index:100', 'user-select:none'
+        ].join(';');
+        document.body.appendChild(overlay);
+    }
+    overlay.textContent = 'seed: ' + SEED;
+}());
 
 // Define the animation loop.
 let startRotation = camera.rotation.z; // Starting rotation
 let endRotationz = startRotation + Math.PI / 2; // Target rotation (90 degrees in radians)
 let endRotationx = startRotation + Math.PI / 7; // Target rotation (45 degrees in radians)
+const DRIFT_AMPLITUDE = 0.009; // micro-drift amplitude after zoom-out (radians, ≈ ±0.5°)
+const DRIFT_SPEED_X   = 0.0003; // drift oscillation rate on X axis
+const DRIFT_SPEED_Z   = 0.0002; // drift oscillation rate on Z axis
 let rotationDuration = 13000; // Duration in milliseconds, adjust as needed
 let rotationDelay = 750; // Delay in millisecond
 let rotationStartTime = Date.now() + rotationDelay; // Start time of the camera rotation
@@ -210,33 +360,34 @@ function animate() {
             // Interpolate camera position
             //camera.position.lerpVectors(startPosition, endPosition, fraction);
         } else {
-            camera.rotation.z = endRotationz; // Ensure it ends at the exact target rotation
-            camera.rotation.x = endRotationx; // Ensure it ends at the exact target rotation
-            camera.zoom = endZoom; // Ensure it ends at the exact target zoom
+            const driftNow = Date.now();
+            camera.rotation.z = endRotationz + Math.sin(driftNow * DRIFT_SPEED_Z) * DRIFT_AMPLITUDE;
+            camera.rotation.x = endRotationx + Math.cos(driftNow * DRIFT_SPEED_X) * DRIFT_AMPLITUDE;
+            camera.zoom = endZoom;
         }
     }
 
-    // Animate each pivot (and thus each clone) with a flapping motion.
-    pivots.forEach((pivot, index) => {
-        // Set the rotation of each pivot.
-        // Using a sine function for a smooth, oscillating rotation that simulates flapping
-        // The sine function oscillates between -1 and 1
-        let sineValue = Math.sin(Date.now() * 0.0015 + index);
-        // Convert the sine output to range from -15 to 45 degrees
-        // The range between -15 and 45 degrees is 60 degrees (45 - (-15))
-        // When sineValue is -1, we want the rotation to be -15 degrees
-        // When sineValue is 1, we want the rotation to be 45 degrees
-        pivot.rotation.y = (sineValue * 30 + 15) * (Math.PI / 180); // Convert degrees to radians
-    });
+    // Animate each scale instance with sinusoidal Y-rotation (wing-flapping motion).
+    // sineValue oscillates between -1 and 1; mapped to -15°…+45° rotation range.
+    const now = Date.now();
+    for (let i = 0; i < NUMBER_OF_SCALES; i++) {
+        const sineValue = Math.sin(now * 0.0015 * SPEED + phaseOffsets[i]);
+        const rotY = (sineValue * 30 + 15) * (Math.PI / 180);
+        _position.set(instancePositions[i*3], instancePositions[i*3+1], instancePositions[i*3+2]);
+        _euler.set(0, rotY, 0);
+        _quaternion.setFromEuler(_euler);
+        _matrix.compose(_position, _quaternion, _scale);
+        instancedFrontBack.setMatrixAt(i, _matrix);
+        instancedSide.setMatrixAt(i, _matrix);
+    }
+    instancedFrontBack.instanceMatrix.needsUpdate = true;
+    instancedSide.instanceMatrix.needsUpdate      = true;
 
     renderer.setSize(1080, 1920);
-    renderer.render(scene, camera); // Render the scene from the perspective of the camera
+    renderer.render(scene, camera);
     if (isCapturing) {
         capturer.capture(renderer.domElement);
     }
 }
 
-animate(); // Start the animation
-
-console.log("scaleColor1 normalized RGB:", scaleColor1Norm);
-console.log("scaleColor2 normalized RGB:", scaleColor2Norm);
+animate();

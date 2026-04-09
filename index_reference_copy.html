@@ -3,38 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Algorithmic visualization of lepidopteran wing microstructure. ~3,750 individually animated 3D scales rendered in real time via Three.js WebGL. Part of the Computational Art History series by Morris Aguilar.">
+    <meta name="description" content="Generative 3D scene by Morris Aguilar inspired by Edward Hopper's architectural compositions. Part of the Computational Art History series. Built with Three.js and WebGL.">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Morris Aguilar — Wing Scale">
-    <meta property="og:description" content="Algorithmic visualization of lepidopteran wing microstructure. ~3,750 individually animated 3D scales rendered in real time via Three.js WebGL.">
+    <meta property="og:title" content="Morris Aguilar — Hopper Window Generative Art">
+    <meta property="og:description" content="Generative 3D scene by Morris Aguilar inspired by Edward Hopper's architectural compositions. Part of the Computational Art History series. Built with Three.js and WebGL.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://morrisglr.github.io/algo-art-lep-scales/">
-    <meta property="og:image" content="https://morrisglr.github.io/algo-art-lep-scales/og-image.png">
+    <meta property="og:url" content="https://morrisglr.github.io/algo-art-hopper/">
+    <meta property="og:image" content="https://morrisglr.github.io/algo-art-hopper/og-image.png">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Morris Aguilar — Wing Scale">
-    <meta name="twitter:description" content="Algorithmic visualization of lepidopteran wing microstructure. ~3,750 individually animated 3D scales rendered in real time via Three.js WebGL.">
-    <meta name="twitter:image" content="https://morrisglr.github.io/algo-art-lep-scales/og-image.png">
+    <meta name="twitter:title" content="Morris Aguilar — Hopper Window Generative Art">
+    <meta name="twitter:description" content="Generative 3D scene by Morris Aguilar inspired by Edward Hopper's architectural compositions. Part of the Computational Art History series. Built with Three.js and WebGL.">
+    <meta name="twitter:image" content="https://morrisglr.github.io/algo-art-hopper/og-image.png">
 
     <meta name="author" content="Morris Aguilar">
-    <link rel="canonical" href="https://morrisglr.github.io/algo-art-lep-scales/">
+    <link rel="canonical" href="https://morrisglr.github.io/algo-art-hopper/">
 
+    <!-- og-image.png (1200×630) required at repo root — capture a screenshot of the live scene -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "VisualArtwork",
-      "name": "Wing Scale",
-      "description": "Algorithmic visualization of lepidopteran wing microstructure. ~3,750 individually animated 3D scales rendered in real time via Three.js WebGL. Part of the Computational Art History series.",
-      "url": "https://morrisglr.github.io/algo-art-lep-scales/",
-      "image": "https://morrisglr.github.io/algo-art-lep-scales/og-image.png",
-      "artMedium": "Algorithmic digital art / Three.js WebGL",
+      "name": "Hopper Window — Generative Art",
+      "description": "Generative 3D scene by Morris Aguilar, Ph.D. inspired by Edward Hopper's architectural compositions. Part of the Computational Art History series. Built with Three.js and WebGL.",
+      "url": "https://morrisglr.github.io/algo-art-hopper/",
+      "image": "https://morrisglr.github.io/algo-art-hopper/og-image.png",
+      "artMedium": "Generative code, WebGL, Three.js",
       "artform": "Generative Art",
-      "dateCreated": "2023",
+      "dateCreated": "2026",
       "creator": {
         "@type": "Person",
-        "name": "Morris Aguilar",
+        "name": "Morris Aguilar, Ph.D.",
         "url": "https://morrisglr.github.io/creative"
       },
       "isPartOf": {
@@ -45,7 +46,7 @@
     }
     </script>
 
-    <title>Morris Aguilar — Wing Scale</title>
+    <title>Morris Aguilar — Hopper Window Generative Art</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -148,12 +149,6 @@
       .info .subtitle {
         font-size: 13px;
         color: #999;
-        margin-bottom: 4px;
-      }
-
-      .info .artist-name {
-        font-size: 12px;
-        color: #666;
         margin-bottom: 20px;
       }
 
@@ -200,16 +195,17 @@
 <body>
   <div id="layout">
     <div class="info">
-      <h1>Wing Scale</h1>
-      <p class="subtitle">Lepidopteran microstructure visualization</p>
-      <p class="artist-name">Morris Aguilar</p>
+      <h1>Hopper Window</h1>
+      <h2 class="subtitle">Morris Aguilar</h2>
       <p class="statement">
-        Each of the ~3750 scales is a custom 3D mesh resembling lepidopteran wing microstructure.
-        Structural coloration is modeled through custom GLSL shaders and real-time Three.js rendering.
+        I reverse-engineer painters' compositional logic into parametric 3D code. Hopper's windows
+        are not incidental — they are the subject: a frame within a frame, depth rendered as
+        emotional distance. This scene derives every proportion from a single parametric chain and
+        renders in real time via Three.js.
       </p>
       <div class="controls">
         <kbd>C</kbd> Export video &nbsp;&middot;&nbsp;
-        <kbd>R</kbd> Replay &nbsp;&middot;&nbsp;
+        <kbd>R</kbd> New composition &nbsp;&middot;&nbsp;
         <kbd>#seed=N</kbd> Reproduce
       </div>
       <p class="portfolio-link">
@@ -223,15 +219,9 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.0.0/build/CCapture.all.min.js"></script>
-  <script src="scales_1.js"></script>
-  <script>
-    renderer.setSize(1080, 1920);
-    const container = document.getElementById('canvas-container');
-    container.appendChild(renderer.domElement);
-    container.classList.add('canvas-ready');
-    camera.position.z = 5;
-  </script>
+  <script src="lib/three.min.js"></script>
+  <script src="lib/CCapture.all.min.js"></script>
+  <script src="utils.js"></script>
+  <script src="hopper.js"></script>
 </body>
 </html>
