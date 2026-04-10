@@ -1,3 +1,5 @@
+![Tests](https://github.com/MorrisGlr/algo-art-lep-scales/actions/workflows/test.yml/badge.svg)
+
 # Lepidopetera Scale Algorithic Art
 
 ## Overview

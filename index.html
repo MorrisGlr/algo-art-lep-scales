@@ -122,6 +122,58 @@
         pointer-events: none;
       }
 
+      #landing-overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(10, 10, 10, 0.82);
+        color: #e0e0e0;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        text-align: center;
+        padding: 24px;
+        z-index: 20;
+        opacity: 1;
+        transition: opacity 1s ease;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      #landing-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      #landing-overlay h2 {
+        font-size: 22px;
+        font-weight: 400;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      #landing-overlay .lo-subtitle {
+        font-size: 13px;
+        color: #aaa;
+        margin-bottom: 4px;
+      }
+
+      #landing-overlay .lo-artist {
+        font-size: 12px;
+        color: #777;
+        margin-bottom: 18px;
+      }
+
+      #landing-overlay .lo-description {
+        font-size: 13px;
+        line-height: 1.6;
+        color: #bbb;
+        max-width: 260px;
+        font-style: italic;
+      }
+
       .info {
         width: 240px;
         flex-shrink: 0;
@@ -220,6 +272,12 @@
     <div id="canvas-container">
       <div id="seed-overlay"></div>
       <div id="recording-indicator"></div>
+      <div id="landing-overlay">
+        <h2>Wing Scale</h2>
+        <p class="lo-subtitle">Lepidopteran microstructure visualization</p>
+        <p class="lo-artist">Morris Aguilar</p>
+        <p class="lo-description">~3,750 individually animated 3D scales modeled after butterfly and moth wing microstructure, rendered in real time via Three.js WebGL.</p>
+      </div>
     </div>
   </div>
 
@@ -232,6 +290,20 @@
     container.appendChild(renderer.domElement);
     container.classList.add('canvas-ready');
     camera.position.z = 5;
+
+    // Landing overlay — auto-fade after 4s, dismiss on click/touch.
+    (function() {
+      const overlay = document.getElementById('landing-overlay');
+      function dismiss() {
+        overlay.classList.add('hidden');
+        overlay.addEventListener('transitionend', function() {
+          overlay.style.display = 'none';
+        }, { once: true });
+      }
+      setTimeout(dismiss, 3000);
+      overlay.addEventListener('click', dismiss, { once: true });
+      overlay.addEventListener('touchstart', dismiss, { once: true, passive: true });
+    }());
   </script>
 </body>
 </html>

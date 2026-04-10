@@ -88,6 +88,27 @@ if (hashParams.palette !== undefined) {
 const activePalette = PALETTES[PALETTE];
 
 // ---------------------------------------------------------------------------
+// Mouse/touch oscillation influence — SPEC 7.1
+// ---------------------------------------------------------------------------
+const MOUSE_INFLUENCE_RADIUS = 1.5;  // world-space units; falloff distance from pointer
+const MOUSE_AMPLITUDE_BOOST  = 0.5;  // fractional increase to rotation range at pointer center
+
+// ---------------------------------------------------------------------------
+// Scroll/gesture zoom — SPEC 7.2
+// ---------------------------------------------------------------------------
+const USER_ZOOM_CLAMP = 0.15;  // max absolute zoom delta from user input
+let userZoomDelta = 0;
+
+// ---------------------------------------------------------------------------
+// Video export presets — triggered by pressing E.
+// 'reveal'  strategy: resets animation to t=0, captures the full zoom-out arc.
+// 'drift'   strategy: skips to post-zoom drift phase, captures a looping steady state.
+// ---------------------------------------------------------------------------
+const EXPORT_15S = { frames: 900,  fps: 60, strategy: 'reveal', label: '15s reveal' };
+const EXPORT_30S = { frames: 1800, fps: 60, strategy: 'drift',  label: '30s drift'  };
+const ACTIVE_EXPORT_PRESET = EXPORT_15S; // swap to EXPORT_30S to change default
+
+// ---------------------------------------------------------------------------
 // Parameters to adjust the animation
 // ---------------------------------------------------------------------------
 let number_of_clones = Math.round(3750 * DENSITY); // base 3750 scales, scaled by density
@@ -120,6 +141,63 @@ const capturer = new CCapture({
     verbose: true,
   });
 let isCapturing = false;
+
+// Export preset state
+let isExporting = false;
+let exportFrameCount = 0;
+let exportPreset = null;
+const exportCapturer = new CCapture({ format: 'webm', framerate: 60, verbose: false });
+
+// Export frame-counter overlay — shows progress during preset export.
+const exportIndicator = (function() {
+    const el = document.getElementById('export-indicator') || document.createElement('div');
+    el.id = 'export-indicator';
+    el.style.cssText = [
+        'position:fixed', 'bottom:28px', 'left:8px',
+        'font-family:monospace', 'font-size:11px',
+        'color:#e03030', 'opacity:0.8', 'pointer-events:none',
+        'z-index:100', 'user-select:none', 'display:none'
+    ].join(';');
+    document.body.appendChild(el);
+    return el;
+}());
+
+function startExport(preset) {
+    if (isExporting) return;
+    isExporting = true;
+    exportPreset = preset;
+    exportFrameCount = 0;
+    exportIndicator.style.display = 'block';
+    exportIndicator.textContent = 'EXP 0 / ' + preset.frames + ' (' + preset.label + ')';
+
+    if (preset.strategy === 'reveal') {
+        // Reset animation to t=0 so the export captures the full zoom-out arc.
+        rotationStartTime = Date.now() + rotationDelay;
+        camera.zoom = startZoom;
+        camera.rotation.x = startRotation;
+        camera.rotation.z = startRotation;
+        camera.updateProjectionMatrix();
+    } else {
+        // 'drift' strategy: fake the clock so the camera is already past the zoom-out.
+        rotationStartTime = Date.now() - rotationDelay - rotationDuration - 1;
+    }
+    exportCapturer.start();
+}
+
+function tickExport() {
+    if (!isExporting) return;
+    exportCapturer.capture(renderer.domElement);
+    exportFrameCount++;
+    exportIndicator.textContent = 'EXP ' + exportFrameCount + ' / ' + exportPreset.frames + ' (' + exportPreset.label + ')';
+    if (exportFrameCount >= exportPreset.frames) {
+        exportCapturer.stop();
+        exportCapturer.save();
+        isExporting = false;
+        exportPreset = null;
+        exportIndicator.style.display = 'none';
+    }
+}
+
 // Add the keydown event listener
 window.addEventListener('keydown', function(event) {
     if (event.key === 'c' || event.key === 'C') {
@@ -138,6 +216,9 @@ window.addEventListener('keydown', function(event) {
         camera.rotation.x = startRotation;
         camera.rotation.z = startRotation;
         camera.updateProjectionMatrix();
+    }
+    if (event.key === 'e' || event.key === 'E') {
+        startExport(ACTIVE_EXPORT_PRESET);
     }
 });
 
@@ -328,6 +409,92 @@ for (let i = 0; i < NUMBER_OF_SCALES; i++) {
     overlay.textContent = 'seed: ' + SEED;
 }());
 
+// ---------------------------------------------------------------------------
+// Mouse/touch pointer tracking — SPEC 7.1
+// Pointer position stored in grid world-space so per-scale distance is cheap.
+// The canvas is centered at origin; divide CSS pixels by spacing to approximate.
+// ---------------------------------------------------------------------------
+let mouseX = Infinity;
+let mouseY = Infinity;
+
+(function() {
+    const cvs = renderer.domElement;
+
+    function updateFromEvent(clientX, clientY) {
+        const rect = cvs.getBoundingClientRect();
+        // Map from CSS pixel (0..rect.width, 0..rect.height) to grid world-space.
+        const normX = (clientX - rect.left)  / rect.width  - 0.5;  // -0.5 .. 0.5
+        const normY = (clientY - rect.top)   / rect.height - 0.5;
+
+        const cols = Math.ceil(Math.sqrt(number_of_clones));
+        const gridW = (cols - 1) * spacing;
+        const gridH = (Math.ceil(number_of_clones / cols) - 1) * verticalSpacing;
+        mouseX = normX * gridW;
+        mouseY = -normY * gridH;  // Y is inverted (screen down = world down)
+    }
+
+    window.addEventListener('mousemove', function(e) {
+        updateFromEvent(e.clientX, e.clientY);
+    });
+    window.addEventListener('mouseleave', function() {
+        mouseX = Infinity;
+        mouseY = Infinity;
+    });
+    cvs.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 1) {
+            updateFromEvent(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    }, { passive: true });
+    cvs.addEventListener('touchend', function() {
+        mouseX = Infinity;
+        mouseY = Infinity;
+    }, { passive: true });
+}());
+
+// ---------------------------------------------------------------------------
+// Scroll/gesture zoom — SPEC 7.2
+// ---------------------------------------------------------------------------
+(function() {
+    // Desktop: wheel event adjusts userZoomDelta.
+    window.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        userZoomDelta = Math.max(-USER_ZOOM_CLAMP, Math.min(USER_ZOOM_CLAMP,
+            userZoomDelta - e.deltaY * 0.0005));
+    }, { passive: false });
+
+    // Mobile: pinch via two-finger touch.
+    let initialPinchDist = null;
+    let initialZoomDelta = 0;
+
+    renderer.domElement.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 2) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            initialPinchDist = Math.sqrt(dx * dx + dy * dy);
+            initialZoomDelta = userZoomDelta;
+        }
+    }, { passive: true });
+
+    renderer.domElement.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 2 && initialPinchDist !== null) {
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const currentDist = Math.sqrt(dx * dx + dy * dy);
+            const scale = currentDist / initialPinchDist;
+            // pinch-out (scale>1) → zoom in (positive delta)
+            const delta = (scale - 1) * USER_ZOOM_CLAMP;
+            userZoomDelta = Math.max(-USER_ZOOM_CLAMP, Math.min(USER_ZOOM_CLAMP,
+                initialZoomDelta + delta));
+        }
+    }, { passive: true });
+
+    renderer.domElement.addEventListener('touchend', function(e) {
+        if (e.touches.length < 2) {
+            initialPinchDist = null;
+        }
+    }, { passive: true });
+}());
+
 // Define the animation loop.
 let startRotation = camera.rotation.z; // Starting rotation
 let endRotationz = startRotation + Math.PI / 2; // Target rotation (90 degrees in radians)
@@ -355,7 +522,7 @@ function animate() {
             let fraction = elapsedTime / rotationDuration;
             camera.rotation.z = startRotation + fraction * (endRotationz - startRotation);
             camera.rotation.x = startRotation + fraction * (endRotationx - startRotation);
-            camera.zoom = startZoom + fraction * (endZoom - startZoom);
+            camera.zoom = startZoom + fraction * (endZoom - startZoom) + userZoomDelta;
             camera.updateProjectionMatrix(); // Important to update the camera's projection matrix
             // Interpolate camera position
             //camera.position.lerpVectors(startPosition, endPosition, fraction);
@@ -363,16 +530,21 @@ function animate() {
             const driftNow = Date.now();
             camera.rotation.z = endRotationz + Math.sin(driftNow * DRIFT_SPEED_Z) * DRIFT_AMPLITUDE;
             camera.rotation.x = endRotationx + Math.cos(driftNow * DRIFT_SPEED_X) * DRIFT_AMPLITUDE;
-            camera.zoom = endZoom;
+            camera.zoom = endZoom + userZoomDelta;
         }
     }
 
     // Animate each scale instance with sinusoidal Y-rotation (wing-flapping motion).
     // sineValue oscillates between -1 and 1; mapped to -15°…+45° rotation range.
+    // Amplitude is boosted for scales near the pointer (SPEC 7.1).
     const now = Date.now();
     for (let i = 0; i < NUMBER_OF_SCALES; i++) {
         const sineValue = Math.sin(now * 0.0015 * SPEED + phaseOffsets[i]);
-        const rotY = (sineValue * 30 + 15) * (Math.PI / 180);
+        const dx = instancePositions[i*3]   - mouseX;
+        const dy = instancePositions[i*3+1] - mouseY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const amplitudeScale = 1 + MOUSE_AMPLITUDE_BOOST * Math.max(0, 1 - dist / MOUSE_INFLUENCE_RADIUS);
+        const rotY = (sineValue * 30 * amplitudeScale + 15) * (Math.PI / 180);
         _position.set(instancePositions[i*3], instancePositions[i*3+1], instancePositions[i*3+2]);
         _euler.set(0, rotY, 0);
         _quaternion.setFromEuler(_euler);
@@ -388,6 +560,7 @@ function animate() {
     if (isCapturing) {
         capturer.capture(renderer.domElement);
     }
+    tickExport();
 }
 
 animate();
