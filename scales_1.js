@@ -51,7 +51,12 @@ const PALETTES = {
     'morpho':       { colorA: 0x00aaff, colorB: 0x0a1080, background: 0x08082e, backgroundB: 0x02020f, iridColor: 0xaaddff },
     'monarch':      { colorA: 0xff8c00, colorB: 0x1a0a00, background: 0xfff0d0, backgroundB: 0xd4a840, iridColor: 0xffcc44 },
     'luna':         { colorA: 0xc8f0a0, colorB: 0x1a5c2a, background: 0xe8f5e0, backgroundB: 0x7aaa6a, iridColor: 0xeeffcc },
-    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, background: 0xe8e0d0, backgroundB: 0xb08050, iridColor: 0xffbb44 }
+    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, background: 0xe8e0d0, backgroundB: 0xb08050, iridColor: 0xffbb44 },
+    'swallowtail':  { colorA: 0xf5e642, colorB: 0x0d0d0d, background: 0x1a1a0a, backgroundB: 0x050500, iridColor: 0xeeff88 },
+    'peacock':      { colorA: 0x00c8b4, colorB: 0x1a0060, background: 0x080830, backgroundB: 0x020218, iridColor: 0x44ffee },
+    'emperor':      { colorA: 0x8844cc, colorB: 0x1a0030, background: 0x0e0020, backgroundB: 0x060010, iridColor: 0xcc88ff },
+    'brimstone':    { colorA: 0xd4f040, colorB: 0x4a6800, background: 0xf0f8d0, backgroundB: 0xa0c040, iridColor: 0xeeff88 },
+    'atlas':        { colorA: 0xc04420, colorB: 0x6a2800, background: 0x2a1008, backgroundB: 0x100400, iridColor: 0xff8844 }
 };
 const VALID_PALETTES = Object.keys(PALETTES);
 
@@ -231,6 +236,25 @@ function tickExport() {
     }
 }
 
+// Switch to a named palette at runtime — updates all uniforms and URL hash in place.
+function switchPalette(name) {
+    PALETTE = name;
+    const p = PALETTES[name];
+    const a   = hexToNormalizedRGB(p.colorA);
+    const b   = hexToNormalizedRGB(p.colorB);
+    const ir  = hexToNormalizedRGB(p.iridColor);
+    const top = hexToNormalizedRGB(p.background);
+    const bot = hexToNormalizedRGB(p.backgroundB);
+    scaleUniforms.colorA.value.set(a.r, a.g, a.b);
+    scaleUniforms.colorB.value.set(b.r, b.g, b.b);
+    scaleUniforms.iridColor.value.set(ir.r, ir.g, ir.b);
+    bgUniforms.bgColorTop.value.set(top.r, top.g, top.b);
+    bgUniforms.bgColorBottom.value.set(bot.r, bot.g, bot.b);
+    const currentHash = parseHashParams();
+    const newHash = Object.assign({}, currentHash, { seed: SEED, palette: name });
+    window.location.hash = Object.keys(newHash).map(function(k) { return k + '=' + newHash[k]; }).join('&');
+}
+
 // Add the keydown event listener
 window.addEventListener('keydown', function(event) {
     if (event.key === 'c' || event.key === 'C') {
@@ -252,6 +276,10 @@ window.addEventListener('keydown', function(event) {
     }
     if (event.key === 'e' || event.key === 'E') {
         startExport(ACTIVE_EXPORT_PRESET);
+    }
+    if (event.key === 'p' || event.key === 'P') {
+        const others = VALID_PALETTES.filter(function(n) { return n !== PALETTE; });
+        switchPalette(others[Math.floor(Math.random() * others.length)]);
     }
 });
 
