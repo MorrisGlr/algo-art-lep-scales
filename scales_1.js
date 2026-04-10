@@ -50,11 +50,11 @@ const DENSITY_DEFAULT = 1.0;
 const SPEED_DEFAULT   = 1.0;
 const PALETTE_DEFAULT = 'original';
 const PALETTES = {
-    'original':     { colorA: 0xeeb792, colorB: 0x20766b, sideTint: 0x969696, background: 0xafeeee },
-    'morpho':       { colorA: 0x00aaff, colorB: 0x0a1080, sideTint: 0x3a5a80, background: 0x08082e },
-    'monarch':      { colorA: 0xff8c00, colorB: 0x1a0a00, sideTint: 0x7a3500, background: 0xfff0d0 },
-    'luna':         { colorA: 0xc8f0a0, colorB: 0x1a5c2a, sideTint: 0x4a8040, background: 0xe8f5e0 },
-    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, sideTint: 0x8b4513, background: 0xe8e0d0 }
+    'original':     { colorA: 0xeeb792, colorB: 0x20766b, background: 0xafeeee, backgroundB: 0x4a9898 },
+    'morpho':       { colorA: 0x00aaff, colorB: 0x0a1080, background: 0x08082e, backgroundB: 0x02020f },
+    'monarch':      { colorA: 0xff8c00, colorB: 0x1a0a00, background: 0xfff0d0, backgroundB: 0xd4a840 },
+    'luna':         { colorA: 0xc8f0a0, colorB: 0x1a5c2a, background: 0xe8f5e0, backgroundB: 0x7aaa6a },
+    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, background: 0xe8e0d0, backgroundB: 0xb08050 }
 };
 const VALID_PALETTES = Object.keys(PALETTES);
 
@@ -114,7 +114,7 @@ const ACTIVE_EXPORT_PRESET = EXPORT_15S; // swap to EXPORT_30S to change default
 let number_of_clones = Math.round(4250 * DENSITY); // base 3750 scales, scaled by density
 let spacing = 0.48; // Set the spacing between clones
 let verticalSpacing = 0.49; // Set the vertical spacing between clones
-let scaleThickness = 0.10; // Set the thickness of the butterfly scale
+let scaleThickness = 0.065; // Set the thickness of the butterfly scale
 
 
 // Set up the basic Three.js scene, camera, and renderer.
@@ -125,7 +125,7 @@ camera.position.y = 0;
 let renderer = new THREE.WebGLRenderer({ antialias: true }); // Create a renderer that will draw our scene
 renderer.setSize(window.innerWidth, window.innerHeight); // Set the size of the rendering view
 document.body.appendChild(renderer.domElement); // Attach the renderer to the HTML document
-renderer.setClearColor(activePalette.background);
+renderer.autoClear = false; // manual clear so background quad renders before main scene
 
 // Lighting: directional (top-right illumination) + ambient (prevents pure-black shadows).
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -239,6 +239,43 @@ const scaleUniforms = {
     colorA: { value: new THREE.Vector3(paletteColorANorm.r, paletteColorANorm.g, paletteColorANorm.b) },
     colorB: { value: new THREE.Vector3(paletteColorBNorm.r, paletteColorBNorm.g, paletteColorBNorm.b) }
 };
+
+// Background gradient — full-screen quad rendered before the main scene.
+// Vertex shader sets gl_Position directly in NDC so the quad is always viewport-filling
+// regardless of camera movement. bgCamera uses identity transforms.
+const bgTopNorm    = hexToNormalizedRGB(activePalette.background);
+const bgBottomNorm = hexToNormalizedRGB(activePalette.backgroundB);
+const bgUniforms = {
+    bgColorTop:    { value: new THREE.Vector3(bgTopNorm.r,    bgTopNorm.g,    bgTopNorm.b) },
+    bgColorBottom: { value: new THREE.Vector3(bgBottomNorm.r, bgBottomNorm.g, bgBottomNorm.b) }
+};
+const bgVertexShader = `
+    varying vec2 vUv;
+    void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+`;
+const bgFragmentShader = `
+    uniform vec3 bgColorTop;
+    uniform vec3 bgColorBottom;
+    varying vec2 vUv;
+    void main() {
+        gl_FragColor = vec4(mix(bgColorBottom, bgColorTop, vUv.y), 1.0);
+    }
+`;
+const bgCamera = new THREE.Camera();
+const bgScene  = new THREE.Scene();
+bgScene.add(new THREE.Mesh(
+    new THREE.PlaneGeometry(2, 2),
+    new THREE.ShaderMaterial({
+        vertexShader:   bgVertexShader,
+        fragmentShader: bgFragmentShader,
+        uniforms:       bgUniforms,
+        depthTest:  false,
+        depthWrite: false
+    })
+));
 const scaleVertexShader = `
     varying vec2 vUv;
     varying vec3 vNormal;
@@ -273,7 +310,12 @@ const scaleMaterial = new THREE.ShaderMaterial({
     uniforms: scaleUniforms,
     side: THREE.DoubleSide
 });
-const sideMaterial = new THREE.MeshBasicMaterial({ color: activePalette.sideTint, side: THREE.DoubleSide });
+const sideMaterial = new THREE.ShaderMaterial({
+    vertexShader:   scaleVertexShader,
+    fragmentShader: scaleFragmentShader,
+    uniforms:       scaleUniforms,
+    side: THREE.DoubleSide
+});
 
 // Custom butterfly scale geometry — BufferGeometry, DoubleSide.
 // 16 base vertices: front ring (z=0) and back ring (z=-scaleThickness).
@@ -294,8 +336,9 @@ const t = scaleThickness; // shorthand
 
 // Helper to build a flat [x,y,z, u,v] entry for the frontBack geometry
 function fbv(x, y, z, u, v) { return [x, y, z, u, v]; }
-// Helper for side geometry: flat [x,y,z]
-function sv(x, y, z) { return [x, y, z]; }
+// Helper for side geometry: flat [x,y,z, u] — u normalizes x from [−0.85, −0.15] → [0, 1]
+// so the gradient runs colorA→colorB left-to-right, matching the front/back face direction.
+function sv(x, y, z) { return [x, y, z, (x + 0.85) / 0.70]; }
 
 // Original UV scheme: every triangle face assigns its three vertices
 // UVs (0.5,0.9), (0.2,0.5), (0.9,0.5) in face-vertex order.
@@ -350,13 +393,17 @@ for (let i = 0; i < 8; i++) {
     sideData.push(sv(fx0, fy0, 0), sv(fx1, fy1, -t), sv(fx0, fy0, -t));
 }
 const sidePositions = new Float32Array(sideData.length * 3);
+const sideUvs       = new Float32Array(sideData.length * 2);
 for (let i = 0; i < sideData.length; i++) {
     sidePositions[i*3]   = sideData[i][0];
     sidePositions[i*3+1] = sideData[i][1];
     sidePositions[i*3+2] = sideData[i][2];
+    sideUvs[i*2]   = sideData[i][3];
+    sideUvs[i*2+1] = 0.5;
 }
 const sideGeometry = new THREE.BufferGeometry();
 sideGeometry.setAttribute('position', new THREE.BufferAttribute(sidePositions, 3));
+sideGeometry.setAttribute('uv',       new THREE.BufferAttribute(sideUvs,       2));
 sideGeometry.computeVertexNormals();
 
 
@@ -562,6 +609,8 @@ function animate() {
     instancedSide.instanceMatrix.needsUpdate      = true;
 
     renderer.setSize(1080, 1920);
+    renderer.clear();
+    renderer.render(bgScene, bgCamera);
     renderer.render(scene, camera);
     if (isCapturing) {
         capturer.capture(renderer.domElement);
