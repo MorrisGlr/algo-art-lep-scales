@@ -28,17 +28,14 @@ function parseHashParams() {
 
 const hashParams = parseHashParams();
 
-// Seed: use #seed=N if present; otherwise generate randomly and write to hash.
+// Seed: use #seed=N if present; otherwise generate randomly.
+// Hash is written later, together with palette, so both land in one URL update.
+const _seedFromHash = hashParams.seed !== undefined && /^\d+$/.test(hashParams.seed);
 let SEED;
-if (hashParams.seed !== undefined && /^\d+$/.test(hashParams.seed)) {
+if (_seedFromHash) {
     SEED = parseInt(hashParams.seed, 10);
 } else {
     SEED = Math.floor(Math.random() * 4294967296);
-    // Write seed into hash so the current view is reproducible.
-    const newHash = Object.assign({}, hashParams, { seed: SEED });
-    window.location.hash = Object.keys(newHash).map(function(k) {
-        return k + '=' + newHash[k];
-    }).join('&');
 }
 
 const seededRandom = mulberry32(SEED);
@@ -78,13 +75,32 @@ if (hashParams.speed !== undefined) {
         console.warn('[wing-scale] speed out of range [0.1, 10.0]; using default', SPEED_DEFAULT);
     }
 }
-if (hashParams.palette !== undefined) {
-    if (VALID_PALETTES.indexOf(hashParams.palette) !== -1) {
-        PALETTE = hashParams.palette;
-    } else {
-        console.warn('[wing-scale] unknown palette "' + hashParams.palette + '"; using default "' + PALETTE_DEFAULT + '"');
-    }
+// Palette: use #palette=name if valid; treat absent or 'random' as "pick randomly".
+// This means every fresh load without an explicit palette gets a new random look,
+// and the chosen palette is written back to the hash alongside the seed.
+const _paletteFromHash = hashParams.palette !== undefined
+    && hashParams.palette !== 'random'
+    && VALID_PALETTES.indexOf(hashParams.palette) !== -1;
+if (hashParams.palette !== undefined
+    && hashParams.palette !== 'random'
+    && !_paletteFromHash) {
+    console.warn('[wing-scale] unknown palette "' + hashParams.palette + '"; picking random');
 }
+if (_paletteFromHash) {
+    PALETTE = hashParams.palette;
+} else {
+    PALETTE = VALID_PALETTES[Math.floor(Math.random() * VALID_PALETTES.length)];
+}
+
+// Write seed + palette to hash whenever either was randomised on this load,
+// making the exact view reproducible from the URL.
+if (!_seedFromHash || !_paletteFromHash) {
+    const newHash = Object.assign({}, hashParams, { seed: SEED, palette: PALETTE });
+    window.location.hash = Object.keys(newHash).map(function(k) {
+        return k + '=' + newHash[k];
+    }).join('&');
+}
+
 const activePalette = PALETTES[PALETTE];
 
 // ---------------------------------------------------------------------------
