@@ -111,10 +111,10 @@ const ACTIVE_EXPORT_PRESET = EXPORT_15S; // swap to EXPORT_30S to change default
 // ---------------------------------------------------------------------------
 // Parameters to adjust the animation
 // ---------------------------------------------------------------------------
-let number_of_clones = Math.round(3750 * DENSITY); // base 3750 scales, scaled by density
+let number_of_clones = Math.round(4250 * DENSITY); // base 3750 scales, scaled by density
 let spacing = 0.48; // Set the spacing between clones
 let verticalSpacing = 0.49; // Set the vertical spacing between clones
-let scaleThickness = 0.15; // Set the thickness of the butterfly scale
+let scaleThickness = 0.10; // Set the thickness of the butterfly scale
 
 
 // Set up the basic Three.js scene, camera, and renderer.
@@ -244,8 +244,14 @@ const scaleVertexShader = `
     varying vec3 vNormal;
     void main() {
         vUv = uv;
-        vNormal = normalize(normalMatrix * normal);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        #ifdef USE_INSTANCING
+            mat4 instancedModelViewMatrix = viewMatrix * instanceMatrix;
+            vNormal = normalize(mat3(instancedModelViewMatrix) * normal);
+            gl_Position = projectionMatrix * instancedModelViewMatrix * vec4(position, 1.0);
+        #else
+            vNormal = normalize(normalMatrix * normal);
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        #endif
     }
 `;
 const scaleFragmentShader = `
