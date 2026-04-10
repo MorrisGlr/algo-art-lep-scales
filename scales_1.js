@@ -50,11 +50,11 @@ const DENSITY_DEFAULT = 1.0;
 const SPEED_DEFAULT   = 1.0;
 const PALETTE_DEFAULT = 'original';
 const PALETTES = {
-    'original':     { colorA: 0xeeb792, colorB: 0x20766b, background: 0xafeeee, backgroundB: 0x4a9898 },
-    'morpho':       { colorA: 0x00aaff, colorB: 0x0a1080, background: 0x08082e, backgroundB: 0x02020f },
-    'monarch':      { colorA: 0xff8c00, colorB: 0x1a0a00, background: 0xfff0d0, backgroundB: 0xd4a840 },
-    'luna':         { colorA: 0xc8f0a0, colorB: 0x1a5c2a, background: 0xe8f5e0, backgroundB: 0x7aaa6a },
-    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, background: 0xe8e0d0, backgroundB: 0xb08050 }
+    'original':     { colorA: 0xeeb792, colorB: 0x20766b, background: 0xafeeee, backgroundB: 0x4a9898, iridColor: 0x80eeff },
+    'morpho':       { colorA: 0x00aaff, colorB: 0x0a1080, background: 0x08082e, backgroundB: 0x02020f, iridColor: 0xaaddff },
+    'monarch':      { colorA: 0xff8c00, colorB: 0x1a0a00, background: 0xfff0d0, backgroundB: 0xd4a840, iridColor: 0xffcc44 },
+    'luna':         { colorA: 0xc8f0a0, colorB: 0x1a5c2a, background: 0xe8f5e0, backgroundB: 0x7aaa6a, iridColor: 0xeeffcc },
+    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, background: 0xe8e0d0, backgroundB: 0xb08050, iridColor: 0xffbb44 }
 };
 const VALID_PALETTES = Object.keys(PALETTES);
 
@@ -111,10 +111,27 @@ const ACTIVE_EXPORT_PRESET = EXPORT_15S; // swap to EXPORT_30S to change default
 // ---------------------------------------------------------------------------
 // Parameters to adjust the animation
 // ---------------------------------------------------------------------------
-let number_of_clones = Math.round(4250 * DENSITY); // base 3750 scales, scaled by density
+let number_of_clones = Math.round(4500 * DENSITY); // base 3750 scales, scaled by density
 let spacing = 0.48; // Set the spacing between clones
 let verticalSpacing = 0.49; // Set the vertical spacing between clones
 let scaleThickness = 0.065; // Set the thickness of the butterfly scale
+
+// Biological shingling — each row sits slightly in front of the one below.
+const SHINGLE_Z_STEP     = 0.010; // Z depth offset per row (upper rows closer to camera)
+
+// Traveling wave — position-based phase creates a coherent diagonal ripple.
+const WAVE_KX            = 0.25;  // spatial frequency, X axis (rad / world-unit)
+const WAVE_KY            = 0.50;  // spatial frequency, Y axis (rad / world-unit)
+
+// Secondary pitch oscillation — slow X-axis tilt overlaid on the main Y-rotation.
+const PITCH_SPEED_FACTOR = 0.37;        // fraction of main oscillation speed
+const PITCH_AMPLITUDE    = 5;           // degrees
+const PITCH_PHASE_OFFSET = Math.PI / 2; // 90° out of phase with Y-rotation
+
+// Mouse pressure wave — click/tap emits an expanding ripple.
+const PRESSURE_WAVE_SPEED    = 4.0;  // world-units per second
+const PRESSURE_WAVE_DURATION = 3500; // ms for the effect to decay
+const PRESSURE_WAVE_STRENGTH = 1.8;  // phase amplitude at the wavefront
 
 
 // Set up the basic Three.js scene, camera, and renderer.
@@ -235,9 +252,11 @@ function hexToNormalizedRGB(hex) {
 }
 const paletteColorANorm = hexToNormalizedRGB(activePalette.colorA);
 const paletteColorBNorm = hexToNormalizedRGB(activePalette.colorB);
+const paletteIridNorm   = hexToNormalizedRGB(activePalette.iridColor);
 const scaleUniforms = {
-    colorA: { value: new THREE.Vector3(paletteColorANorm.r, paletteColorANorm.g, paletteColorANorm.b) },
-    colorB: { value: new THREE.Vector3(paletteColorBNorm.r, paletteColorBNorm.g, paletteColorBNorm.b) }
+    colorA:    { value: new THREE.Vector3(paletteColorANorm.r, paletteColorANorm.g, paletteColorANorm.b) },
+    colorB:    { value: new THREE.Vector3(paletteColorBNorm.r, paletteColorBNorm.g, paletteColorBNorm.b) },
+    iridColor: { value: new THREE.Vector3(paletteIridNorm.r,   paletteIridNorm.g,   paletteIridNorm.b)   }
 };
 
 // Background gradient — full-screen quad rendered before the main scene.
@@ -277,30 +296,44 @@ bgScene.add(new THREE.Mesh(
     })
 ));
 const scaleVertexShader = `
-    varying vec2 vUv;
-    varying vec3 vNormal;
+    attribute float aColorShift;
+    varying vec2  vUv;
+    varying vec3  vNormal;
+    varying float vFaceOn;
+    varying float vColorShift;
     void main() {
-        vUv = uv;
+        vUv         = uv;
+        vColorShift = aColorShift;
         #ifdef USE_INSTANCING
             mat4 instancedModelViewMatrix = viewMatrix * instanceMatrix;
-            vNormal = normalize(mat3(instancedModelViewMatrix) * normal);
+            vNormal  = normalize(mat3(instancedModelViewMatrix) * normal);
+            vFaceOn  = abs(instanceMatrix[0][0]); // |cos θ| of Y-rotation: 1=face-on, 0=edge-on
             gl_Position = projectionMatrix * instancedModelViewMatrix * vec4(position, 1.0);
         #else
-            vNormal = normalize(normalMatrix * normal);
+            vNormal  = normalize(normalMatrix * normal);
+            vFaceOn  = 1.0;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         #endif
     }
 `;
 const scaleFragmentShader = `
-    uniform vec3 colorA;
-    uniform vec3 colorB;
-    varying vec2 vUv;
-    varying vec3 vNormal;
+    uniform vec3  colorA;
+    uniform vec3  colorB;
+    uniform vec3  iridColor;
+    varying vec2  vUv;
+    varying vec3  vNormal;
+    varying float vFaceOn;
+    varying float vColorShift;
     void main() {
         vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
         float diffuse = max(dot(vNormal, lightDir), 0.0);
         float lightFactor = 0.5 + 0.5 * diffuse;
-        vec3 color = mix(colorA, colorB, vUv.x) * lightFactor;
+        // vColorShift ([-0.5, 0.5] from seeded PRNG) offsets gradient sampling per scale.
+        float uvX = clamp(vUv.x + vColorShift * 0.35, 0.0, 1.0);
+        // iridescence: scales flash toward iridColor when rotating edge-on.
+        float shimmer = smoothstep(1.0, 0.7, vFaceOn) * 0.6;
+        vec3 baseColor = mix(colorA, colorB, uvX);
+        vec3 color = mix(baseColor, iridColor, shimmer) * lightFactor;
         gl_FragColor = vec4(color, 1.0);
     }
 `;
@@ -426,9 +459,11 @@ const instancePositions = new Float32Array(NUMBER_OF_SCALES * 3);
 for (let i = 0; i < NUMBER_OF_SCALES; i++) {
     let row = Math.floor(i / rows);
     let col = i % rows;
-    instancePositions[i*3]   = (col * spacing)        - (gridWidth  / 2);
+    // Odd rows stagger right by half a column spacing (brick/shingle pattern).
+    // Each row sits SHINGLE_Z_STEP closer to the camera than the row below it.
+    instancePositions[i*3]   = (col * spacing) - (gridWidth / 2) + (row % 2) * (spacing / 2);
     instancePositions[i*3+1] = (row * verticalSpacing) - (gridHeight / 2);
-    instancePositions[i*3+2] = 0;
+    instancePositions[i*3+2] = row * SHINGLE_Z_STEP;
 }
 
 // Reusable objects for per-frame matrix composition.
@@ -438,11 +473,24 @@ const _quaternion = new THREE.Quaternion();
 const _scale      = new THREE.Vector3(1, 1, 1);
 const _euler      = new THREE.Euler();
 
-// Per-scale oscillation phase offsets — seeded so the same seed always produces
-// the same wave pattern. Each offset is a random angle in [0, 2π).
+// Per-scale color shifts — seeded so the same seed always produces the same
+// mottled color pattern. Each value is in [-0.5, +0.5] and shifts the gradient
+// sample point in the fragment shader, making some scales warmer, others cooler.
+const colorShifts = new Float32Array(NUMBER_OF_SCALES);
+for (let i = 0; i < NUMBER_OF_SCALES; i++) {
+    colorShifts[i] = seededRandom() - 0.5;
+}
+// Expose colorShifts as a per-instance attribute on both geometries.
+// THREE.InstancedBufferAttribute marks this as instanced (one value per scale).
+frontBackGeometry.setAttribute('aColorShift', new THREE.InstancedBufferAttribute(colorShifts, 1));
+sideGeometry.setAttribute(     'aColorShift', new THREE.InstancedBufferAttribute(colorShifts, 1));
+
+// Traveling wave phase offsets — position-based so the oscillation propagates
+// as a coherent diagonal ripple rather than independent random flickers.
+// Must be computed after instancePositions (depends on grid coordinates).
 const phaseOffsets = new Float32Array(NUMBER_OF_SCALES);
 for (let i = 0; i < NUMBER_OF_SCALES; i++) {
-    phaseOffsets[i] = seededRandom() * Math.PI * 2;
+    phaseOffsets[i] = instancePositions[i*3] * WAVE_KX + instancePositions[i*3+1] * WAVE_KY;
 }
 
 // Seed overlay — display current seed in bottom-left corner.
@@ -502,6 +550,27 @@ let mouseY = Infinity;
         mouseX = Infinity;
         mouseY = Infinity;
     }, { passive: true });
+}());
+
+// ---------------------------------------------------------------------------
+// Mouse pressure waves — click/tap emits a ripple that propagates outward.
+// ---------------------------------------------------------------------------
+const waveEvents = [];
+const MAX_WAVE_EVENTS = 5;
+
+(function() {
+    const cvs = renderer.domElement;
+    function emitWave(clientX, clientY) {
+        const rect = cvs.getBoundingClientRect();
+        const normX = (clientX - rect.left) / rect.width  - 0.5;
+        const normY = (clientY - rect.top)  / rect.height - 0.5;
+        const cols  = Math.ceil(Math.sqrt(number_of_clones));
+        const gridW = (cols - 1) * spacing;
+        const gridH = (Math.ceil(number_of_clones / cols) - 1) * verticalSpacing;
+        if (waveEvents.length >= MAX_WAVE_EVENTS) waveEvents.shift();
+        waveEvents.push({ x: normX * gridW, y: -normY * gridH, startTime: Date.now() });
+    }
+    cvs.addEventListener('click', function(e) { emitWave(e.clientX, e.clientY); });
 }());
 
 // ---------------------------------------------------------------------------
@@ -587,19 +656,38 @@ function animate() {
         }
     }
 
-    // Animate each scale instance with sinusoidal Y-rotation (wing-flapping motion).
-    // sineValue oscillates between -1 and 1; mapped to -15°…+45° rotation range.
-    // Amplitude is boosted for scales near the pointer (SPEC 7.1).
+    // Animate each scale instance.
+    // Main oscillation: sinusoidal Y-rotation (wing-flapping), -15°…+45° range.
+    // Secondary pitch: slow X-axis tilt layered over the main motion.
+    // Pressure waves: additive phase contribution from click/tap ripple events.
     const now = Date.now();
     for (let i = 0; i < NUMBER_OF_SCALES; i++) {
-        const sineValue = Math.sin(now * 0.0015 * SPEED + phaseOffsets[i]);
+        // Accumulate phase contribution from all active pressure wave events.
+        let wavePhase = 0;
+        for (let w = 0; w < waveEvents.length; w++) {
+            const ev   = waveEvents[w];
+            const wdx  = instancePositions[i*3]   - ev.x;
+            const wdy  = instancePositions[i*3+1] - ev.y;
+            const wDist   = Math.sqrt(wdx * wdx + wdy * wdy);
+            const arrival = ev.startTime + (wDist / PRESSURE_WAVE_SPEED) * 1000;
+            const elapsed = now - arrival;
+            if (elapsed > 0 && elapsed < PRESSURE_WAVE_DURATION) {
+                const decay = 1 - elapsed / PRESSURE_WAVE_DURATION;
+                wavePhase += Math.sin(elapsed * 0.004) * decay * PRESSURE_WAVE_STRENGTH;
+            }
+        }
+
+        const basePhase  = now * 0.0015 * SPEED + phaseOffsets[i];
+        const sineValue  = Math.sin(basePhase + wavePhase);
         const dx = instancePositions[i*3]   - mouseX;
         const dy = instancePositions[i*3+1] - mouseY;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const amplitudeScale = 1 + MOUSE_AMPLITUDE_BOOST * Math.max(0, 1 - dist / MOUSE_INFLUENCE_RADIUS);
         const rotY = (sineValue * 30 * amplitudeScale + 15) * (Math.PI / 180);
+        const pitchSine = Math.sin(now * 0.0015 * SPEED * PITCH_SPEED_FACTOR + phaseOffsets[i] + PITCH_PHASE_OFFSET);
+        const rotX = pitchSine * PITCH_AMPLITUDE * (Math.PI / 180);
         _position.set(instancePositions[i*3], instancePositions[i*3+1], instancePositions[i*3+2]);
-        _euler.set(0, rotY, 0);
+        _euler.set(rotX, rotY, 0);
         _quaternion.setFromEuler(_euler);
         _matrix.compose(_position, _quaternion, _scale);
         instancedFrontBack.setMatrixAt(i, _matrix);
@@ -607,6 +695,13 @@ function animate() {
     }
     instancedFrontBack.instanceMatrix.needsUpdate = true;
     instancedSide.instanceMatrix.needsUpdate      = true;
+
+    // Prune wave events that have fully decayed across the entire grid.
+    for (let w = waveEvents.length - 1; w >= 0; w--) {
+        if (now - waveEvents[w].startTime > PRESSURE_WAVE_DURATION + 8000) {
+            waveEvents.splice(w, 1);
+        }
+    }
 
     renderer.setSize(1080, 1920);
     renderer.clear();
