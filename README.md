@@ -3,7 +3,7 @@
 
 # Wing Scale — Lepidopteran Microstructure Visualization
 
-<!-- TODO: embed demo video (mp4) here when recorded -->
+<video src="https://github.com/user-attachments/assets/3d996f8b-f536-4d54-b220-ae77a528710e" autoplay loop muted playsinline width="100%"></video>
 
 **[→ Open in browser](https://morrisglr.github.io/algo-art-lep-scales/)** — no install required.
 
@@ -72,6 +72,6 @@ Butterfly and moth wings are covered by overlapping scales that give these [lepi
 
 ## About
 
-Morris Aguilar is an MD-PhD candidate (MSTP) whose work spans clinical AI and computational biology. This project is part of the [Computational Art History](https://morrisglr.github.io/creative) series, which translates biological and artistic structures into parametric browser-based systems.
+Morris Aguilar, M.D./Ph.D., has work spans clinical AI and computational biology. This project is part of the [Computational Art History](https://morrisglr.github.io/creative) series, which translates biological and artistic structures into parametric browser-based systems.
 
-[@morrisglr.bsky.social](https://bsky.app/profile/morrisglr.bsky.social) · [Creative Portfolio](https://morrisglr.github.io/creative)
+[@morrisglr.bsky.social](https://bsky.app/profile/morrisglr.bsky.social) · [Creative Portfolio](https://morrisglr.github.io/creative) · [LinkedIn](https://www.linkedin.com/in/morris-a-aguilar/)
