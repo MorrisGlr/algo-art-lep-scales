@@ -1,17 +1,41 @@
 ![Tests](https://github.com/MorrisGlr/algo-art-lep-scales/actions/workflows/test.yml/badge.svg)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Open-blue)](https://morrisglr.github.io/algo-art-lep-scales/)
 
-# Lepidopetera Scale Algorithic Art
+# Wing Scale — Lepidopteran Microstructure Visualization
 
-## Overview
-My [algorithmic art](https://en.wikipedia.org/wiki/Algorithmic_art) (algo art) project was inspired by the overlapping scales of butterfly and moth wings. The animation is created using the Three.js library, that allows web browsers to play 3D graphic animations. 
+<!-- TODO: embed demo video (mp4) here when recorded -->
 
-<b>You can view the animation in your own browser by following [this link](https://morrisglr.github.io/algo-art-lep-scales/)!</b>
+**[→ Open in browser](https://morrisglr.github.io/algo-art-lep-scales/)** — no install required.
 
-## Visual Description
-I created a simple 3D model of scales placed on a repeating grid pattern. I had the scales gently oscillate to create a wave-like motion. Each animation starts with a close-up of a cluster of scales and slowly zooms out to reveal the entire grid of scales and how, in aggregate, they have motion similar to ripples.
+---
+
+## What This Is
+
+An algorithmic visualization of butterfly and moth wing microstructure, rendered in real-time with Three.js. ~4,500 individually modeled scales oscillate in a standing wave, with structural coloration and iridescence modeled through custom GLSL shaders.
+
+Inspired by the observation that lepidopteran scales — usually invisible to the naked eye — collectively produce the appearance of fluid motion, much like pixels resolving into image at distance.
+
+## Controls
+
+| Key / Action | Effect |
+|---|---|
+| `click` | Trigger ripple from cursor |
+| `P` | Cycle color palette |
+| `R` | Replay animation |
+| `C` | Export video |
+| `scroll` / pinch | Zoom in / out |
+| `#seed=N` | Set color pattern via URL (e.g. `#seed=42`) |
+
+## Technical Notes
+
+- ~4,500 custom 3D meshes (scale geometry)
+- Structural coloration and iridescence: custom GLSL shaders (vertex + fragment)
+- Real-time Three.js rendering (WebGL)
+- No build step — runs directly in browser from `index.html`
 
 ## Conceptual Inspiration
-Butterfly and moth wings are covered by overlapping scales that give these [lepidopterans](https://en.wikipedia.org/wiki/Lepidoptera) their color and wing patterns. However, the scales are usually too small to be seen individually by the naked eye. Magnified images reaveal the repeating scale organization that motivated to translate these visuals into algorithmic art. Seeing the individual scales is like looking at the pixels in a digital image and as one zooms out, the scales collectively look like a rolling wave of color.
+
+Butterfly and moth wings are covered by overlapping scales that give these [lepidopterans](https://en.wikipedia.org/wiki/Lepidoptera) their color and wing patterns. However, the scales are usually too small to be seen individually by the naked eye. Magnified images reveal the repeating scale organization that motivated translating these visuals into algorithmic art. Seeing the individual scales is like looking at the pixels in a digital image — as one zooms out, the scales collectively look like a rolling wave of color.
 
 <table>
   <tr>
@@ -46,9 +70,8 @@ Butterfly and moth wings are covered by overlapping scales that give these [lepi
   </tr>
 </table>
 
-## Technical Overview
-I made the this project can run directly on any web browser, making it accessible and easy to share. I used the Three.js library to create the 3D environment that would run in a browser. 
+## About
 
-# Contact
-Morris A. Aguilar, Ph.D.<br>
-@morrisglr.bsky.social
+Morris Aguilar is an MD-PhD candidate (MSTP) whose work spans clinical AI and computational biology. This project is part of the [Computational Art History](https://morrisglr.github.io/creative) series, which translates biological and artistic structures into parametric browser-based systems.
+
+[@morrisglr.bsky.social](https://bsky.app/profile/morrisglr.bsky.social) · [Creative Portfolio](https://morrisglr.github.io/creative)
