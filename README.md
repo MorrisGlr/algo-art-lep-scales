@@ -74,6 +74,6 @@ Butterfly and moth wings are covered by overlapping scales that give these [lepi
 
 ## About
 
-Morris Aguilar, M.D./Ph.D., has work spans clinical AI and computational biology. This project is part of the [Computational Art History](https://morrisglr.github.io/creative) series, which translates biological and artistic structures into parametric browser-based systems.
+Morris Aguilar, M.D./Ph.D., has work that spans clinical AI and computational biology. This project is part of the [Computational Art History](https://morrisglr.github.io/creative) series, which translates biological and artistic structures into parametric browser-based systems.
 
 [@morrisglr.bsky.social](https://bsky.app/profile/morrisglr.bsky.social) · [Creative Portfolio](https://morrisglr.github.io/creative) · [LinkedIn](https://www.linkedin.com/in/morris-a-aguilar/)
