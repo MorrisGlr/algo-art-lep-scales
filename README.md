@@ -3,7 +3,9 @@
 
 # Wing Scale — Lepidopteran Microstructure Visualization
 
-<video src="https://github.com/user-attachments/assets/3d996f8b-f536-4d54-b220-ae77a528710e" autoplay loop muted playsinline width="100%"></video>
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/3d996f8b-f536-4d54-b220-ae77a528710e" autoplay loop muted playsinline width="80%"></video>
+</div>
 
 **[→ Open in browser](https://morrisglr.github.io/algo-art-lep-scales/)** — no install required.
 
