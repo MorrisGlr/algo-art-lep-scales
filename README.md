@@ -28,6 +28,19 @@ Inspired by the observation that lepidopteran scales — usually invisible to th
 | `scroll` / pinch | Zoom in / out |
 | `#seed=N` | Set color pattern via URL (e.g. `#seed=42`) |
 
+## URL Parameters
+
+Append these to the URL to share a specific composition or customize the piece — no coding required:
+
+| Parameter | Range / Options | Description |
+|---|---|---|
+| `#seed=N` | any integer | Sets the color-shift pattern across all scales — the same seed always produces the same visual |
+| `#palette=name` | `original`, `morpho`, `monarch`, `luna`, `painted-lady`, `swallowtail`, `peacock`, `emperor`, `brimstone`, `atlas` | Color palette named after a butterfly or moth species |
+| `#density=N` | 0.25 – 4.0 | Number of scales — try `0.5` for sparse, `2.0` for dense |
+| `#speed=N` | 0.1 – 10.0 | Oscillation speed — try `0.3` for slow and meditative, `3.0` for frantic |
+
+Example: [`#seed=42&palette=morpho&density=1.5`](https://morrisglr.github.io/algo-art-lep-scales/#seed=42&palette=morpho&density=1.5)
+
 ## Technical Notes
 
 - ~4,500 custom 3D meshes (scale geometry)
@@ -74,7 +87,12 @@ Butterfly and moth wings are covered by overlapping scales that give these [lepi
 
 ## About
 
-Morris Aguilar, M.D./Ph.D., has work that spans clinical AI and computational biology. This project is part of the computational art history series, which translates biological and artistic structures into parametric browser-based systems.
+Morris Aguilar, M.D./Ph.D., has work that spans clinical AI and computational biology. This project is part of the **Computational Art History** series, which translates biological and artistic structures into parametric browser-based systems.
+
+**Series:**
+- [Wing Scale](https://morrisglr.github.io/algo-art-lep-scales/) — lepidopteran wing microstructure → animated scale grid *(this piece)*
+- [algo-art-hopper](https://github.com/MorrisGlr/algo-art-hopper) — Edward Hopper's window compositions → Three.js parallax scene
+- [algo-art-klint-kandinsky](https://github.com/MorrisGlr/algo-art-klint-kandinsky) — Hilma af Klint and Kandinsky's abstract compositions → p5.js extruded shapes
 
 ## Contact
 
