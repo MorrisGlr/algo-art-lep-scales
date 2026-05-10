@@ -41,6 +41,16 @@ Append these to the URL to share a specific composition or customize the piece â
 
 Example: [`#seed=42&palette=morpho&density=1.5`](https://morrisglr.github.io/algo-art-lep-scales/#seed=42&palette=morpho&density=1.5)
 
+## Try These Seeds
+
+Each seed sets a unique, reproducible color-shift arrangement across all ~4,500 scales. The same seed produces the same visual on every load. Share any of these URLs to pass along a specific composition.
+
+| Composition | Description |
+|---|---|
+| [Seed 42](https://morrisglr.github.io/algo-art-lep-scales/#seed=42) | The original tan-to-teal palette at a mid-range seed. Per-scale color variation is distributed across the grid and most legible at the zoom-out resting position. |
+| [Seed 999](https://morrisglr.github.io/algo-art-lep-scales/#seed=999) | A distinct color-shift pattern from seed 42 on the same palette. Worth comparing directly to see how much the seed parameter changes the visual character of the surface. |
+| [Seed 31415 Â· Morpho](https://morrisglr.github.io/algo-art-lep-scales/#seed=31415&palette=morpho) | The Morpho palette shifts the gradient into blue and violet, referencing the structural coloration of *Morpho* butterfly wing scales. Iridescent highlights are more pronounced in this palette as scales rotate edge-on. |
+
 ## Technical Notes
 
 - ~4,500 custom 3D meshes (scale geometry)
