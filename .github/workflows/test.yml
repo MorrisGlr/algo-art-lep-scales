@@ -16,4 +16,4 @@ jobs:
         with:
           node-version: '20'
       - name: Run tests
-        run: node --test tests/utils.test.js
+        run: node --test 'tests/*.test.js'

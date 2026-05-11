@@ -1,15 +1,17 @@
 // ---------------------------------------------------------------------------
-// Seeded PRNG — mulberry32
-// Accepts a 32-bit integer seed; returns a function that produces floats [0,1).
+// Domain config — sourced from wing-scale-config.js (loaded before this file).
 // ---------------------------------------------------------------------------
-function mulberry32(seed) {
-    return function() {
-        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
-        let z = Math.imul(seed ^ seed >>> 15, 1 | seed);
-        z = z + Math.imul(z ^ z >>> 7, 61 | z) ^ z;
-        return ((z ^ z >>> 14) >>> 0) / 4294967296;
-    };
-}
+const mulberry32         = WingScaleConfig.prng;
+const PALETTES           = WingScaleConfig.palettes;
+const SHINGLE_Z_STEP     = WingScaleConfig.geometry.shingleZStep;
+const WAVE_KX            = WingScaleConfig.wave.kx;
+const WAVE_KY            = WingScaleConfig.wave.ky;
+const PITCH_SPEED_FACTOR = WingScaleConfig.pitch.speedFactor;
+const PITCH_AMPLITUDE    = WingScaleConfig.pitch.amplitude;
+const PITCH_PHASE_OFFSET = WingScaleConfig.pitch.phaseOffset;
+const PRESSURE_WAVE_SPEED    = WingScaleConfig.pressureWave.speed;
+const PRESSURE_WAVE_DURATION = WingScaleConfig.pressureWave.duration;
+const PRESSURE_WAVE_STRENGTH = WingScaleConfig.pressureWave.strength;
 
 // ---------------------------------------------------------------------------
 // URL hash parameter parsing
@@ -46,18 +48,6 @@ const seededRandom = mulberry32(SEED);
 const DENSITY_DEFAULT = 1.0;
 const SPEED_DEFAULT   = 1.0;
 const PALETTE_DEFAULT = 'original';
-const PALETTES = {
-    'original':     { colorA: 0xeeb792, colorB: 0x20766b, background: 0xafeeee, backgroundB: 0x4a9898, iridColor: 0x80eeff },
-    'morpho':       { colorA: 0x00aaff, colorB: 0x0a1080, background: 0x08082e, backgroundB: 0x02020f, iridColor: 0xaaddff },
-    'monarch':      { colorA: 0xff8c00, colorB: 0x1a0a00, background: 0xfff0d0, backgroundB: 0xd4a840, iridColor: 0xffcc44 },
-    'luna':         { colorA: 0xc8f0a0, colorB: 0x1a5c2a, background: 0xe8f5e0, backgroundB: 0x7aaa6a, iridColor: 0xeeffcc },
-    'painted-lady': { colorA: 0xd4622a, colorB: 0xf0d898, background: 0xe8e0d0, backgroundB: 0xb08050, iridColor: 0xffbb44 },
-    'swallowtail':  { colorA: 0xf5e642, colorB: 0x0d0d0d, background: 0x1a1a0a, backgroundB: 0x050500, iridColor: 0xeeff88 },
-    'peacock':      { colorA: 0x00c8b4, colorB: 0x1a0060, background: 0x080830, backgroundB: 0x020218, iridColor: 0x44ffee },
-    'emperor':      { colorA: 0x8844cc, colorB: 0x1a0030, background: 0x0e0020, backgroundB: 0x060010, iridColor: 0xcc88ff },
-    'brimstone':    { colorA: 0xd4f040, colorB: 0x4a6800, background: 0xf0f8d0, backgroundB: 0xa0c040, iridColor: 0xeeff88 },
-    'atlas':        { colorA: 0xc04420, colorB: 0x6a2800, background: 0x2a1008, backgroundB: 0x100400, iridColor: 0xff8844 }
-};
 const VALID_PALETTES = Object.keys(PALETTES);
 
 let DENSITY = DENSITY_DEFAULT;
@@ -132,27 +122,10 @@ const ACTIVE_EXPORT_PRESET = EXPORT_15S; // swap to EXPORT_30S to change default
 // ---------------------------------------------------------------------------
 // Parameters to adjust the animation
 // ---------------------------------------------------------------------------
-let number_of_clones = Math.round(4500 * DENSITY); // base 3750 scales, scaled by density
-let spacing = 0.48; // Set the spacing between clones
-let verticalSpacing = 0.49; // Set the vertical spacing between clones
-let scaleThickness = 0.065; // Set the thickness of the butterfly scale
-
-// Biological shingling — each row sits slightly in front of the one below.
-const SHINGLE_Z_STEP     = 0.010; // Z depth offset per row (upper rows closer to camera)
-
-// Traveling wave — position-based phase creates a coherent diagonal ripple.
-const WAVE_KX            = 0.25;  // spatial frequency, X axis (rad / world-unit)
-const WAVE_KY            = 0.50;  // spatial frequency, Y axis (rad / world-unit)
-
-// Secondary pitch oscillation — slow X-axis tilt overlaid on the main Y-rotation.
-const PITCH_SPEED_FACTOR = 0.37;        // fraction of main oscillation speed
-const PITCH_AMPLITUDE    = 5;           // degrees
-const PITCH_PHASE_OFFSET = Math.PI / 2; // 90° out of phase with Y-rotation
-
-// Mouse pressure wave — click/tap emits an expanding ripple.
-const PRESSURE_WAVE_SPEED    = 4.0;  // world-units per second
-const PRESSURE_WAVE_DURATION = 3500; // ms for the effect to decay
-const PRESSURE_WAVE_STRENGTH = 1.8;  // phase amplitude at the wavefront
+const spacing        = WingScaleConfig.geometry.spacing;
+const verticalSpacing = WingScaleConfig.geometry.verticalSpacing;
+const scaleThickness = WingScaleConfig.geometry.scaleThickness;
+let number_of_clones = Math.round(WingScaleConfig.geometry.baseScaleCount * DENSITY);
 
 
 // Set up the basic Three.js scene, camera, and renderer.
