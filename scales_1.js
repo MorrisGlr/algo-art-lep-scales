@@ -266,6 +266,8 @@ window.addEventListener('keydown', function(event) {
             capturer.stop();
             capturer.save();
         }
+        var recInd = document.getElementById('recording-indicator');
+        if (recInd) recInd.style.display = isCapturing ? 'inline' : 'none';
     }
     if (event.key === 'r' || event.key === 'R') {
         rotationStartTime = Date.now() + rotationDelay;

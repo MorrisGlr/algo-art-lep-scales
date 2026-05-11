@@ -103,28 +103,59 @@
         }
       }
 
-      #seed-overlay {
+      #seed-bar {
         position: absolute;
         bottom: 8px;
         left: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 10;
         font-family: monospace;
         font-size: 11px;
         color: rgba(255, 255, 255, 0.5);
-        z-index: 10;
+      }
+
+      #seed-overlay {
         pointer-events: none;
+      }
+
+      #share-btn {
+        background: rgba(255, 255, 255, 0.11);
+        border: 1px solid rgba(255, 255, 255, 0.38);
+        border-radius: 20px;
+        color: #bbb;
+        font-family: monospace;
+        font-size: 11px;
+        letter-spacing: 0.03em;
+        cursor: pointer;
+        padding: 3px 9px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+      }
+
+      #share-btn:hover {
+        background: rgba(255, 255, 255, 0.18);
+        border-color: rgba(255, 255, 255, 0.6);
+        color: rgba(255, 255, 255, 0.95);
+      }
+
+      #share-btn svg {
+        flex-shrink: 0;
       }
 
       #recording-indicator {
         display: none;
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: #e03030;
-        z-index: 10;
-        pointer-events: none;
+        color: #ff4444;
+        letter-spacing: 0.05em;
+        animation: rec-blink 1s step-start infinite;
+      }
+
+      @keyframes rec-blink {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.3; }
       }
 
       .info {
@@ -254,16 +285,25 @@
     </div>
 
     <div id="canvas-container">
-      <video id="video-fallback" autoplay loop muted playsinline>
-        <source src="demo.mp4" type="video/mp4">
+      <video id="video-fallback" autoplay loop muted playsinline poster="media/morris_aguilar_scales_21.jpeg">
+        <source src="https://github.com/user-attachments/assets/3d996f8b-f536-4d54-b220-ae77a528710e" type="video/mp4">
       </video>
       <noscript>
         <p style="position:absolute;bottom:8px;left:0;right:0;text-align:center;font-family:monospace;font-size:11px;color:rgba(255,255,255,0.7);margin:0;z-index:2;">
           JavaScript required — use Chrome, Firefox, or Safari to view the live animation.
         </p>
       </noscript>
-      <div id="seed-overlay"></div>
-      <div id="recording-indicator"></div>
+      <div id="seed-bar">
+        <span id="seed-overlay"></span>
+        <span id="recording-indicator">● REC</span>
+        <button id="share-btn" aria-label="Copy seed link to clipboard">
+          <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          <span id="share-btn-label">Copy seed link</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -276,6 +316,18 @@
     container.appendChild(renderer.domElement);
     document.getElementById('video-fallback').style.display = 'none';
     camera.position.z = 5;
+
+    (function() {
+      var btn = document.getElementById('share-btn');
+      var lbl = document.getElementById('share-btn-label');
+      if (!btn || !lbl) return;
+      btn.addEventListener('click', function() {
+        navigator.clipboard.writeText(window.location.href).then(function() {
+          lbl.textContent = 'Copied!';
+          setTimeout(function() { lbl.textContent = 'Copy seed link'; }, 1500);
+        });
+      });
+    }());
   </script>
 </body>
 </html>
